@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>[Kende] Proc Trackers — WeakAura mockup</title>
+<style>
+  :root {
+    --bg: #14161b;
+    --panel: #1e2129;
+    --panel-border: #2e3341;
+    --text: #d8dbe2;
+    --muted: #8b91a0;
+    --accent: #c9a24a;
+    --accent2: #4a9eea;
+    --accent3: #e0654a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, Segoe UI, sans-serif; }
+  body { display: grid; grid-template-rows: auto 1fr; }
+
+  header { padding: 10px 16px; border-bottom: 1px solid var(--panel-border); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .hint { color: var(--muted); font-size: 12px; }
+
+  main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+  #stage { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 12px; }
+
+  /* Fake game screen: 1366 x 768 "UI units" (WoW UIParent at default UI scale). */
+  #screen {
+    position: relative; width: 1366px; height: 768px; flex: none;
+    transform-origin: top left;
+    background: radial-gradient(ellipse at 50% 60%, #2b3446 0%, #171b24 55%, #0d0f14 100%);
+    outline: 1px solid #3a4051; user-select: none;
+  }
+  #screen .cross-v, #screen .cross-h { position: absolute; pointer-events: none; border: 0 dashed rgba(255,255,255,0.12); }
+  #screen .cross-v { left: 683px; top: 0; height: 100%; border-left-width: 1px; }
+  #screen .cross-h { top: 384px; left: 0; width: 100%; border-top-width: 1px; }
+  .placeholder { position: absolute; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 3px; color: rgba(255,255,255,0.25); font-size: 11px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+
+  /* Any aura bar */
+  .aura { position: absolute; display: flex; cursor: grab; touch-action: none; }
+  .aura.dragging { cursor: grabbing; }
+  .aura .icon { flex: none; background: #2a1a2e; background-size: cover; background-position: center; }
+  .aura .bar { position: relative; flex: 1; background: rgba(0,0,0,0.5); overflow: hidden; }
+  .aura .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: var(--fill, #71b157); } /* "Solid" status bar texture */
+  .aura .ticks { position: absolute; inset: 0; pointer-events: none; }
+  .aura .tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(255,255,255,1); }
+  .aura .txt { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 5px; color: #fff; font-family: "Friz Quadrata TT", "Friz Quadrata", Georgia, "Times New Roman", serif; font-weight: 700; text-shadow: -1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000, 0 0 3px #000; white-space: nowrap; }
+  .aura .txt.left { left: 0; }
+  .aura .txt.right { right: 0; }
+  .aura .txt.center { left: 0; right: 0; justify-content: center; }
+  .aura .handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; background: var(--accent); border: 1px solid #000; cursor: nwse-resize; border-radius: 2px; opacity: 0.85; }
+  .aura .outline { position: absolute; inset: -2px; border: 1px dashed rgba(201,162,74,0.7); pointer-events: none; }
+  .aura.bar2 .handle { background: var(--accent2); }
+  .aura.bar2 .outline { border-color: rgba(74,158,234,0.7); }
+  .aura.bar3 .handle { background: var(--accent3); }
+  .aura.bar3 .outline { border-color: rgba(224,101,74,0.7); }
+
+  aside { border-left: 1px solid var(--panel-border); background: var(--panel); padding: 14px; overflow: auto; }
+  aside h3 { font-size: 12px; margin: 0 0 8px; padding: 6px 8px; border-radius: 4px; background: #12141a; }
+  aside h3.bar1 { color: #9fe0ab; }
+  aside h3.bar2 { color: #a9d4f5; }
+  aside h3.bar3 { color: #f0a893; }
+  .block { border: 1px solid var(--panel-border); border-radius: 6px; padding: 10px; margin-bottom: 14px; }
+  .row { display: grid; grid-template-columns: 1fr 90px; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .row label { color: var(--text); }
+  .row input[type=number], .row input[type=color] { width: 100%; background: #12141a; color: var(--text); border: 1px solid var(--panel-border); border-radius: 4px; padding: 4px 6px; font: inherit; }
+  .row input[type=color] { padding: 0 2px; height: 28px; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  button { background: #2a2f3b; color: var(--text); border: 1px solid var(--panel-border); border-radius: 4px; padding: 6px 10px; font: inherit; cursor: pointer; }
+  button:hover { background: #343a48; }
+  button.primary { background: #4a3d7a; border-color: #6a58a8; }
+  button.primary:hover { background: #57488f; }
+  button.primary2 { background: #274766; border-color: #3f7cad; }
+  button.primary2:hover { background: #2f588a; }
+  button.primary3 { background: #6a3226; border-color: #ad573f; }
+  button.primary3:hover { background: #833d2c; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  code { background: #12141a; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  .status { font-size: 12px; color: var(--accent); min-height: 18px; margin-top: 4px; }
+  .status.b2 { color: var(--accent2); }
+  .status.b3 { color: var(--accent3); }
+</style>
+</head>
+<body>
+<header>
+  <h1>[Kende] Proc Trackers — WeakAura mockup (by Kendeclise)</h1>
+  <span class="hint">Drag a bar to move it · drag its corner to resize · values on the right map 1:1 to the WeakAuras options (all three bars anchor to the same group, CENTER of screen).</span>
+</header>
+<main>
+  <div id="stage">
+    <div id="screen">
+      <div class="cross-v"></div><div class="cross-h"></div>
+      <div class="placeholder" style="left:20px;top:20px;width:190px;height:50px;">player frame</div>
+      <div class="placeholder" style="left:230px;top:20px;width:190px;height:50px;">target frame</div>
+      <div class="placeholder" style="left:383px;bottom:8px;width:600px;height:38px;">action bars</div>
+      <div class="placeholder" style="right:12px;bottom:12px;width:230px;height:150px;">minimap / chat</div>
+
+      <div class="aura bar1" id="aura1">
+        <div class="icon" id="icon1"></div>
+        <div class="bar">
+          <div class="fill" id="fill1"></div>
+          <div class="ticks" id="ticks1"></div>
+          <div class="txt left" id="left1">7</div>
+          <div class="txt right" id="right1">3.7</div>
+        </div>
+        <div class="outline"></div>
+        <div class="handle" id="handle1" title="Resize"></div>
+      </div>
+
+      <div class="aura bar2" id="aura2">
+        <div class="icon" id="icon2"></div>
+        <div class="bar">
+          <div class="fill" id="fill2"></div>
+          <div class="ticks" id="ticks2"></div>
+          <div class="txt left" id="left2">Tempus Repit</div>
+          <div class="txt right" id="right2">6.4</div>
+        </div>
+        <div class="outline"></div>
+        <div class="handle" id="handle2" title="Resize"></div>
+      </div>
+
+      <div class="aura bar3" id="aura3">
+        <div class="icon" id="icon3"></div>
+        <div class="bar">
+          <div class="fill" id="fill3"></div>
+          <div class="ticks" id="ticks3"></div>
+          <div class="txt center" id="center3">2.1</div>
+        </div>
+        <div class="outline"></div>
+        <div class="handle" id="handle3" title="Resize"></div>
+      </div>
+    </div>
+  </div>
+
+  <aside>
+    <h3 class="bar1">Bar 1 — Black Blood of Y'Shaarj proc</h3>
+    <div class="block">
+      <div class="row"><label for="w1">Width</label><input id="w1" type="number" min="60" max="1000" step="1"></div>
+      <div class="row"><label for="h1">Height</label><input id="h1" type="number" min="10" max="200" step="1"></div>
+      <div class="row"><label for="x1">X offset</label><input id="x1" type="number" step="1"></div>
+      <div class="row"><label for="y1">Y offset</label><input id="y1" type="number" step="1"></div>
+      <div class="btns"><button id="reset1">Reset (center, 3/4 up)</button></div>
+      <div class="row" style="margin-top:8px"><label for="cNormal">Bar color</label><input id="cNormal" type="color" value="#71b157"></div>
+      <div class="row"><label for="cPeak">Snapshot window color</label><input id="cPeak" type="color" value="#e6b422"></div>
+      <div class="row"><label for="peakStacks">Highlight from stack ≥</label><input id="peakStacks" type="number" min="1" max="10" step="1" value="9"></div>
+      <div class="check"><input id="sound1" type="checkbox" checked><label for="sound1">Play sound on proc (Error Beep)</label></div>
+      <div class="btns">
+        <button id="sim1" class="primary">Simulate proc (10 s + 2 s tail)</button>
+        <button id="stop1">Stop</button>
+      </div>
+      <div class="status" id="status1"></div>
+      <div class="row" style="margin-top:8px"><label for="elapsed1">Elapsed seconds (0–12)</label><input id="elapsed1" type="number" min="0" max="12" step="0.1" value="6.3"></div>
+      <div class="note">"Wrath of the Darkspear" (146184) lasts 10 s, ticking every second; each tick adds a stack of "Wrath" (146202, the real Intellect buff, 2 s duration refreshed by every tick). Stacks reach 10 at second 10 and linger ~2 s after the bar ends — that tail is the gold snapshot window. Text: stacks (left), seconds remaining (right). Style: 300×30, "Solid" texture, green, white ticks at 1–9 s, trinket icon on the left. Works for every item version.</div>
+    </div>
+
+    <h3 class="bar2">Bar 2 — Sinister Primal Diamond proc</h3>
+    <div class="block">
+      <div class="row"><label for="w2">Width</label><input id="w2" type="number" min="60" max="1000" step="1"></div>
+      <div class="row"><label for="h2">Height</label><input id="h2" type="number" min="10" max="200" step="1"></div>
+      <div class="row"><label for="x2">X offset</label><input id="x2" type="number" step="1"></div>
+      <div class="row"><label for="y2">Y offset</label><input id="y2" type="number" step="1"></div>
+      <div class="btns"><button id="reset2">Reset (40 units below bar 1)</button></div>
+      <div class="row" style="margin-top:8px"><label for="cBlue">Bar color</label><input id="cBlue" type="color" value="#4a9eea"></div>
+      <div class="check"><input id="sound2" type="checkbox" checked><label for="sound2">Play sound on proc (Electrical Spark)</label></div>
+      <div class="btns">
+        <button id="sim2" class="primary2">Simulate proc (10 s, static)</button>
+        <button id="stop2">Stop</button>
+      </div>
+      <div class="status b2" id="status2"></div>
+      <div class="row" style="margin-top:8px"><label for="elapsed2">Elapsed seconds (0–10)</label><input id="elapsed2" type="number" min="0" max="10" step="0.1" value="4"></div>
+      <div class="note">Meta gem "Sinister Primal Diamond" procs "Tempus Repit" (137590): flat +30% spell haste for 10 s, no stacks. 9 tick marks at 1–9 s. The bar drains for the full 10 s and disappears the moment the buff falls off — no tail. Style: 300×30 "Solid" bar, blue, meta gem's own icon on the left.</div>
+    </div>
+
+    <h3 class="bar3">Bar 3 — Unerring Vision of Lei Shen proc</h3>
+    <div class="block">
+      <div class="row"><label for="w3">Width</label><input id="w3" type="number" min="60" max="1000" step="1"></div>
+      <div class="row"><label for="h3">Height</label><input id="h3" type="number" min="10" max="200" step="1"></div>
+      <div class="row"><label for="x3">X offset</label><input id="x3" type="number" step="1"></div>
+      <div class="row"><label for="y3">Y offset</label><input id="y3" type="number" step="1"></div>
+      <div class="btns"><button id="reset3">Reset (40 units above bar 1)</button></div>
+      <div class="row" style="margin-top:8px"><label for="cOrange">Bar color</label><input id="cOrange" type="color" value="#e0654a"></div>
+      <div class="check"><input id="sound3" type="checkbox" checked><label for="sound3">Play sound on proc (Boxing Arena Gong)</label></div>
+      <div class="btns">
+        <button id="sim3" class="primary3">Simulate proc (4 s, static)</button>
+        <button id="stop3">Stop</button>
+      </div>
+      <div class="status b3" id="status3"></div>
+      <div class="row" style="margin-top:8px"><label for="elapsed3">Elapsed seconds (0–4)</label><input id="elapsed3" type="number" min="0" max="4" step="0.1" value="1.5"></div>
+      <div class="note">Trinket "Unerring Vision of Lei Shen" procs "Perfect Aim" (138963): flat +100% critical strike chance for 4 s, no stacks. 3 tick marks at 1–3 s. Very short window — the bar drains fast and disappears the instant it falls off. Works for every item version (LFR/Celestial, Normal, Thunderforged, Heroic, Heroic Thunderforged — all share the same spell IDs). Style: 300×30 "Solid" bar, orange/red, trinket's own icon, centered time text (matches this trinket's look in your original base aura).</div>
+    </div>
+
+    <div class="note">Position numbers on all three blocks are in WeakAuras units, anchor CENTER → CENTER. Positive Y = up. All three bars live in the same parent <strong>dynamic group</strong>: only the procs that are currently active are shown, auto-stacked with no gap for an inactive one — nothing to reconfigure if you don't have all 3 trinkets. In-game, dragging the group moves all of them together; here each bar is draggable independently for previewing layout. Screen is 1366×768 units (1 unit ≈ 1.41 px at 1080p, ≈ 1.88 px at 1440p).</div>
+  </aside>
+</main>
+
+<script>
+(function () {
+  const SCREEN_W = 1366, SCREEN_H = 768;
+
+  function fitScreen() {
+    const stage = document.getElementById('stage');
+    const screen = document.getElementById('screen');
+    const pad = 24;
+    const s = Math.min((stage.clientWidth - pad) / SCREEN_W, (stage.clientHeight - pad) / SCREEN_H, 1);
+    screen.style.transform = `scale(${s})`;
+    screen.dataset.scale = s;
+    screen.style.marginRight = -(SCREEN_W - SCREEN_W * s) + 'px';
+    screen.style.marginBottom = -(SCREEN_H - SCREEN_H * s) + 'px';
+  }
+
+  const $ = (id) => document.getElementById(id);
+  let audioCtx = null;
+  function ctx() { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+
+  // Generic drag/resize/layout wiring shared by all bars.
+  function createBar({ auraId, iconId, fillId, leftId, rightId, wId, hId, xId, yId, resetId, handleId, defaultState, iconUrl }) {
+    const aura = $(auraId), icon = $(iconId), fill = $(fillId), leftEl = leftId && $(leftId), rightEl = rightId && $(rightId), handle = $(handleId);
+    const inW = $(wId), inH = $(hId), inX = $(xId), inY = $(yId);
+    const screen = $('screen');
+    const state = { ...defaultState };
+
+    const img = new Image();
+    img.onload = () => { icon.style.backgroundImage = `url(${iconUrl})`; };
+    img.src = iconUrl;
+
+    function layout() {
+      const { width, height, xOffset, yOffset } = state;
+      aura.style.width = width + 'px';
+      aura.style.height = height + 'px';
+      aura.style.left = (SCREEN_W / 2 + xOffset - width / 2) + 'px';
+      aura.style.top = (SCREEN_H / 2 - yOffset - height / 2) + 'px';
+      icon.style.width = height + 'px';
+      const fs = Math.max(9, Math.round(height * 0.5));
+      if (leftEl) leftEl.style.fontSize = fs + 'px';
+      if (rightEl) rightEl.style.fontSize = fs + 'px';
+      inW.value = width; inH.value = height; inX.value = xOffset; inY.value = yOffset;
+    }
+
+    const num = (el, fallback) => { const v = parseFloat(el.value); return Number.isFinite(v) ? v : fallback; };
+    inW.addEventListener('input', () => { state.width = Math.max(60, num(inW, state.width)); layout(); });
+    inH.addEventListener('input', () => { state.height = Math.max(10, num(inH, state.height)); layout(); });
+    inX.addEventListener('input', () => { state.xOffset = Math.round(num(inX, state.xOffset)); layout(); });
+    inY.addEventListener('input', () => { state.yOffset = Math.round(num(inY, state.yOffset)); layout(); });
+    $(resetId).addEventListener('click', () => { Object.assign(state, { xOffset: defaultState.xOffset, yOffset: defaultState.yOffset }); layout(); });
+
+    let drag = null;
+    function scale() { return parseFloat(screen.dataset.scale || '1'); }
+    aura.addEventListener('pointerdown', (ev) => {
+      if (ev.target === handle) return;
+      drag = { mode: 'move', sx: ev.clientX, sy: ev.clientY, x0: state.xOffset, y0: state.yOffset };
+      aura.classList.add('dragging'); aura.setPointerCapture(ev.pointerId); ev.preventDefault();
+    });
+    handle.addEventListener('pointerdown', (ev) => {
+      drag = { mode: 'resize', sx: ev.clientX, sy: ev.clientY, w0: state.width, h0: state.height };
+      handle.setPointerCapture(ev.pointerId); ev.stopPropagation(); ev.preventDefault();
+    });
+    function onMove(ev) {
+      if (!drag) return;
+      const dx = (ev.clientX - drag.sx) / scale(), dy = (ev.clientY - drag.sy) / scale();
+      if (drag.mode === 'move') {
+        state.xOffset = Math.round(drag.x0 + dx);
+        state.yOffset = Math.round(drag.y0 - dy);
+      } else {
+        state.width = Math.max(60, Math.round(drag.w0 + dx));
+        state.height = Math.max(10, Math.round(drag.h0 + dy));
+      }
+      layout();
+    }
+    function onUp() { drag = null; aura.classList.remove('dragging'); }
+    aura.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointermove', onMove);
+    aura.addEventListener('pointerup', onUp); aura.addEventListener('pointercancel', onUp);
+    handle.addEventListener('pointerup', onUp); handle.addEventListener('pointercancel', onUp);
+
+    window.addEventListener('resize', fitScreen);
+    layout();
+    return { aura, icon, fill, leftEl, rightEl, state, layout };
+  }
+
+  // Static per-second tick marks (for bars whose duration doesn't change mid-simulation).
+  function addTicks(containerId, count, duration) {
+    const container = $(containerId);
+    for (let i = 1; i <= count; i++) {
+      const t = document.createElement('div');
+      t.className = 'tick'; t.style.left = (i / duration * 100) + '%';
+      container.appendChild(t);
+    }
+  }
+
+  // --- Sound previews (WebAudio approximations, not the exact packaged .ogg) ---
+  function errorBeep() {
+    const c = ctx(), now = c.currentTime;
+    [[300, 0], [250, 0.12]].forEach(([f, delay]) => {
+      const o = c.createOscillator(), a = c.createGain();
+      o.type = 'sawtooth'; o.frequency.value = f;
+      const t0 = now + delay;
+      a.gain.setValueAtTime(0.2, t0); a.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
+      o.connect(a).connect(c.destination); o.start(t0); o.stop(t0 + 0.12);
+    });
+  }
+  function electricalSpark() {
+    const c = ctx(), now = c.currentTime;
+    // Buzzy, crackling zap: a fast-decaying sawtooth with a jittery frequency sweep.
+    const o = c.createOscillator(), a = c.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(2200, now);
+    for (let i = 1; i <= 6; i++) {
+      o.frequency.linearRampToValueAtTime(600 + Math.random() * 1800, now + i * 0.02);
+    }
+    a.gain.setValueAtTime(0.22, now); a.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+    o.connect(a).connect(c.destination); o.start(now); o.stop(now + 0.15);
+  }
+  function boxingArenaGong() {
+    const c = ctx(), now = c.currentTime;
+    // Big metallic gong: a low fundamental plus inharmonic overtones, long decay.
+    [[110, 1], [185, 0.6], [261, 0.4], [370, 0.25]].forEach(([f, g]) => {
+      const o = c.createOscillator(), a = c.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      a.gain.setValueAtTime(g * 0.3, now); a.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+      o.connect(a).connect(c.destination); o.start(now); o.stop(now + 1.9);
+    });
+  }
+
+  // --- Bar 1: Black Blood of Y'Shaarj (10 s aura + 2 s max-stack tail) ---
+  const DURATION1 = 10, TAIL1 = 2, MAX_STACKS = 10;
+  const bar1 = createBar({
+    auraId: 'aura1', iconId: 'icon1', fillId: 'fill1', leftId: 'left1', rightId: 'right1',
+    wId: 'w1', hId: 'h1', xId: 'x1', yId: 'y1', resetId: 'reset1', handleId: 'handle1',
+    defaultState: { width: 300, height: 30, xOffset: 0, yOffset: 192 },
+    iconUrl: 'https://wow.zamimg.com/images/wow/icons/large/inv_jewelry_orgrimmarraid_trinket_02.jpg',
+  });
+  const ticks1 = $('ticks1');
+  const tickEls1 = [];
+  for (let i = 1; i <= 9; i++) {
+    const t = document.createElement('div');
+    t.className = 'tick'; t.style.left = (i * 10) + '%';
+    ticks1.appendChild(t); tickEls1.push(t);
+  }
+  function layoutTicks1(duration) {
+    tickEls1.forEach((t, idx) => {
+      const seconds = idx + 1;
+      t.style.display = seconds < duration ? '' : 'none';
+      t.style.left = (seconds / duration * 100) + '%';
+    });
+  }
+  function render1(elapsed) {
+    const e = Math.max(0, Math.min(DURATION1 + TAIL1, elapsed));
+    const stacks = Math.min(MAX_STACKS, Math.floor(e + 1e-9));
+    const inTail = e >= DURATION1;
+    const fillPct = inTail ? ((e - DURATION1) / TAIL1) : (e / DURATION1);
+    const remaining = inTail ? (DURATION1 + TAIL1 - e) : (DURATION1 - e);
+    const peak = stacks >= parseInt($('peakStacks').value || '10', 10);
+    bar1.fill.style.width = (fillPct * 100) + '%';
+    bar1.fill.style.setProperty('--fill', peak ? $('cPeak').value : $('cNormal').value);
+    layoutTicks1(inTail ? TAIL1 : DURATION1);
+    bar1.leftEl.textContent = stacks > 0 ? stacks : '';
+    bar1.rightEl.textContent = remaining < 10 ? remaining.toFixed(1) : '10';
+    bar1.aura.style.visibility = (state1.simulating && e >= DURATION1 + TAIL1) ? 'hidden' : 'visible';
+  }
+  const state1 = { simulating: false, simStart: 0, raf: 0 };
+  function tick1(ts) {
+    if (!state1.simulating) return;
+    const e = (ts - state1.simStart) / 1000;
+    render1(e);
+    $('status1').textContent = e < DURATION1 ? `Proc active — ${(DURATION1 - e).toFixed(1)} s left on the 10 s aura`
+      : e < DURATION1 + TAIL1 ? `Max stacks tail — ${(DURATION1 + TAIL1 - e).toFixed(1)} s of 10 stacks left`
+      : 'Buff expired (bar hides).';
+    if (e < DURATION1 + TAIL1 + 1.5) state1.raf = requestAnimationFrame(tick1);
+    else stopSim1();
+  }
+  function startSim1() {
+    stopSim1();
+    state1.simulating = true;
+    if ($('sound1').checked) errorBeep();
+    state1.simStart = performance.now();
+    state1.raf = requestAnimationFrame(tick1);
+  }
+  function stopSim1() {
+    state1.simulating = false;
+    cancelAnimationFrame(state1.raf);
+    bar1.aura.style.visibility = 'visible';
+    render1(parseFloat($('elapsed1').value || '0'));
+    if ($('status1').textContent.startsWith('Proc') || $('status1').textContent.startsWith('Max')) $('status1').textContent = '';
+  }
+  $('sim1').addEventListener('click', startSim1);
+  $('stop1').addEventListener('click', () => { stopSim1(); $('status1').textContent = ''; });
+  ['elapsed1', 'cNormal', 'cPeak', 'peakStacks'].forEach(id => $(id).addEventListener('input', () => { if (!state1.simulating) render1(parseFloat($('elapsed1').value || '0')); }));
+
+  // --- Bar 2: Sinister Primal Diamond (flat 10 s buff, no stacks, drains) ---
+  const DURATION2 = 10;
+  const bar2 = createBar({
+    auraId: 'aura2', iconId: 'icon2', fillId: 'fill2', leftId: 'left2', rightId: 'right2',
+    wId: 'w2', hId: 'h2', xId: 'x2', yId: 'y2', resetId: 'reset2', handleId: 'handle2',
+    defaultState: { width: 300, height: 30, xOffset: 0, yOffset: 152 },
+    iconUrl: 'https://wow.zamimg.com/images/wow/icons/large/inv_legendary_chimeraoffear.jpg',
+  });
+  addTicks('ticks2', 9, DURATION2);
+  function render2(elapsed) {
+    const e = Math.max(0, Math.min(DURATION2, elapsed));
+    const remaining = DURATION2 - e;
+    const fillPct = 1 - (e / DURATION2); // inverse = false: drains
+    bar2.fill.style.width = (fillPct * 100) + '%';
+    bar2.fill.style.setProperty('--fill', $('cBlue').value);
+    bar2.rightEl.textContent = remaining < 10 ? remaining.toFixed(1) : '10';
+    bar2.aura.style.visibility = (state2.simulating && e >= DURATION2) ? 'hidden' : 'visible';
+  }
+  const state2 = { simulating: false, simStart: 0, raf: 0 };
+  function tick2(ts) {
+    if (!state2.simulating) return;
+    const e = (ts - state2.simStart) / 1000;
+    render2(e);
+    $('status2').textContent = e < DURATION2 ? `Tempus Repit active — ${(DURATION2 - e).toFixed(1)} s left` : 'Buff expired (bar hides).';
+    if (e < DURATION2 + 1) state2.raf = requestAnimationFrame(tick2);
+    else stopSim2();
+  }
+  function startSim2() {
+    stopSim2();
+    state2.simulating = true;
+    if ($('sound2').checked) electricalSpark();
+    state2.simStart = performance.now();
+    state2.raf = requestAnimationFrame(tick2);
+  }
+  function stopSim2() {
+    state2.simulating = false;
+    cancelAnimationFrame(state2.raf);
+    bar2.aura.style.visibility = 'visible';
+    render2(parseFloat($('elapsed2').value || '0'));
+    if ($('status2').textContent.startsWith('Tempus')) $('status2').textContent = '';
+  }
+  $('sim2').addEventListener('click', startSim2);
+  $('stop2').addEventListener('click', () => { stopSim2(); $('status2').textContent = ''; });
+  $('elapsed2').addEventListener('input', () => { if (!state2.simulating) render2(parseFloat($('elapsed2').value || '0')); });
+  $('cBlue').addEventListener('input', () => { if (!state2.simulating) render2(parseFloat($('elapsed2').value || '0')); });
+
+  // --- Bar 3: Unerring Vision of Lei Shen (flat 4 s buff, no stacks, drains) ---
+  const DURATION3 = 4;
+  const bar3 = createBar({
+    auraId: 'aura3', iconId: 'icon3', fillId: 'fill3',
+    wId: 'w3', hId: 'h3', xId: 'x3', yId: 'y3', resetId: 'reset3', handleId: 'handle3',
+    defaultState: { width: 300, height: 30, xOffset: 0, yOffset: 232 },
+    iconUrl: 'https://wow.zamimg.com/images/wow/icons/large/ability_hunter_focusedaim.jpg',
+  });
+  addTicks('ticks3', 3, DURATION3);
+  const center3 = $('center3');
+  function render3(elapsed) {
+    const e = Math.max(0, Math.min(DURATION3, elapsed));
+    const remaining = DURATION3 - e;
+    const fillPct = 1 - (e / DURATION3);
+    bar3.fill.style.width = (fillPct * 100) + '%';
+    bar3.fill.style.setProperty('--fill', $('cOrange').value);
+    center3.style.fontSize = Math.max(9, Math.round(bar3.state.height * 0.5)) + 'px';
+    center3.textContent = remaining < 10 ? remaining.toFixed(1) : '10';
+    bar3.aura.style.visibility = (state3.simulating && e >= DURATION3) ? 'hidden' : 'visible';
+  }
+  const state3 = { simulating: false, simStart: 0, raf: 0 };
+  function tick3(ts) {
+    if (!state3.simulating) return;
+    const e = (ts - state3.simStart) / 1000;
+    render3(e);
+    $('status3').textContent = e < DURATION3 ? `Perfect Aim active — ${(DURATION3 - e).toFixed(1)} s left` : 'Buff expired (bar hides).';
+    if (e < DURATION3 + 1) state3.raf = requestAnimationFrame(tick3);
+    else stopSim3();
+  }
+  function startSim3() {
+    stopSim3();
+    state3.simulating = true;
+    if ($('sound3').checked) boxingArenaGong();
+    state3.simStart = performance.now();
+    state3.raf = requestAnimationFrame(tick3);
+  }
+  function stopSim3() {
+    state3.simulating = false;
+    cancelAnimationFrame(state3.raf);
+    bar3.aura.style.visibility = 'visible';
+    render3(parseFloat($('elapsed3').value || '0'));
+    if ($('status3').textContent.startsWith('Perfect')) $('status3').textContent = '';
+  }
+  $('sim3').addEventListener('click', startSim3);
+  $('stop3').addEventListener('click', () => { stopSim3(); $('status3').textContent = ''; });
+  $('elapsed3').addEventListener('input', () => { if (!state3.simulating) render3(parseFloat($('elapsed3').value || '0')); });
+  $('cOrange').addEventListener('input', () => { if (!state3.simulating) render3(parseFloat($('elapsed3').value || '0')); });
+
+  fitScreen();
+  render1(parseFloat($('elapsed1').value || '0'));
+  render2(parseFloat($('elapsed2').value || '0'));
+  render3(parseFloat($('elapsed3').value || '0'));
+})();
+</script>
+</body>
+</html>

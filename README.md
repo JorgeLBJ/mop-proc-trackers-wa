@@ -18,8 +18,8 @@ All three bars share one dynamic group: only active procs are shown, auto-stacke
 | `BlackBlood-YShaarj.aura.lua` | The Lua source table the import string is generated from. |
 | `wago-description.md` | Full description for the wago.io listing. |
 | `patch-notes.md` | Short changelog text for wago.io version updates. |
-| `assets/preview.png` | Screenshot used above, generated from the local mockup. |
-| `.mockups/` | Local, git-ignored HTML mockups used to preview/tune the WeakAura before publishing. |
+| `assets/preview.png` | Screenshot used above, generated from `mockup-black-blood.html`. |
+| `mockup-black-blood.html` | Standalone interactive mockup: drag/resize each bar, preview colors, and simulate procs in a browser (open the file directly, no server needed). |
 
 ## Regenerating the import string
 
